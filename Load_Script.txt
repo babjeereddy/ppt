@@ -1,0 +1,415 @@
+Basic load
+Students:
+LOAD
+    StudentID,
+    StudentName,
+    Class,
+    City,
+    Age
+FROM [lib://Data/Students.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+
+INLINE LOAD
+Create a small table directly in the script without an external file.
+Grades:
+LOAD * INLINE [
+Grade, MinMarks, MaxMarks
+A, 85, 100
+B, 70, 84
+C, 50, 69
+D, 0, 49
+];
+
+
+RESIDENT LOAD
+A resident load reads a table already loaded into memory.
+Students:
+LOAD *
+FROM [lib://Data/Students.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+StudentSummary:
+LOAD
+    Class,
+    Count(StudentID) AS StudentCount,
+    Avg(Age) AS AverageAge
+RESIDENT Students
+GROUP BY Class;
+
+
+Preceding LOAD
+A preceding load places one LOAD statement above another.
+Students:
+LOAD
+    StudentID,
+    Trim(StudentName) AS StudentName,
+    Age,
+    If(Age >= 16, 'Senior', 'Junior') AS AgeGroup;
+LOAD
+    StudentID,
+    StudentName,
+    Age
+FROM [lib://Data/Students.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+
+The lower load reads the CSV. The upper load transforms its result.
+
+
+
+
+
+
+HighMarks:
+LOAD
+    StudentID,
+    Subject,
+    Marks
+FROM [lib://Data/Marks.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq)
+WHERE Marks >= 85;
+
+
+
+
+LOAD
+    StudentID,
+    StudentName,
+    Age
+FROM [lib://Data/Students.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+UniqueCities:
+LOAD DISTINCT City
+RESIDENT Students;
+
+
+
+
+
+
+StudentTransform:
+LOAD
+    StudentID,
+    Trim(StudentName) AS CleanStudentName,
+    Upper(Trim(City)) AS CityUpper,
+    Age,
+    If(Age >= 16, 'Senior', 'Junior') AS AgeGroup,
+    Year(Date#(AdmissionDate, 'YYYY-MM-DD')) AS AdmissionYear
+FROM [lib://Data/Students.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+
+
+MarksTransformed:
+LOAD
+    StudentID,
+    Subject,
+    Marks,
+    If(Marks >= 85, 'Excellent',
+        If(Marks >= 70, 'Good',
+            If(Marks >= 35, 'Pass', 'Fail')
+        )
+    ) AS Performance
+FROM [lib://Data/Marks.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+
+
+Products:
+LOAD
+    ProductID,
+    ProductName,
+    Category,
+    UnitPrice
+FROM [lib://Data/Products.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+Sales:
+LOAD
+    OrderID,
+    ProductID,
+    Region,
+    Quantity
+FROM [lib://Data/Sales.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+
+LEFT JOIN (Sales)
+LOAD
+    ProductID,
+    ProductName,
+    Category,
+    UnitPrice
+RESIDENT Products;
+
+
+
+
+Qlik Sense automatically concatenates tables when they have the same number of fields with matching field names.
+
+NOCONCATENATE prevents Qlik Sense from automatically combining the new table with another table that has the same structure.
+
+
+SalesCalculated:
+NOCONCATENATE
+LOAD
+    *,
+    Quantity * UnitPrice AS GrossSales
+RESIDENT Sales;
+
+
+
+Marks:
+LOAD
+    StudentID,
+    Subject,
+    Marks
+FROM [lib://Data/Marks.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+StudentPerformance:
+LOAD
+    StudentID,
+    Sum(Marks) AS TotalMarks,
+    Avg(Marks) AS AverageMarks,
+    Max(Marks) AS HighestMarks,
+    Min(Marks) AS LowestMarks,
+    Count(Subject) AS SubjectCount
+RESIDENT Marks
+GROUP BY StudentID;
+
+
+ApplyMap() looks up the region target without joining an entire table into the sales records. The 0 is the fallback value if the region isn't found.
+
+
+Sales:
+LOAD
+    OrderID,
+    ProductID,
+    Region,
+    Quantity
+FROM [lib://Data/Sales.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+RegionTargetMap:
+MAPPING LOAD
+    Region,
+    MonthlyTarget
+FROM [lib://Data/Targets.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+SalesWithTarget:
+LOAD
+    *,
+    ApplyMap('RegionTargetMap', Region, 0) AS MonthlyTarget
+RESIDENT Sales;
+
+
+
+concatenate
+
+Term1:
+LOAD StudentID, Subject, Marks
+FROM [lib://Data/Marks.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+// Example with a second file containing the same fields:
+// CONCATENATE (Term1)
+// LOAD StudentID, Subject, Marks
+// FROM [lib://Data/Marks_Term2.txt]
+// (txt, utf8, embedded labels, delimiter is ',', msq);
+
+
+QuarterlySales:
+Crosstable (Quarter, SalesAmount, 1)
+LOAD
+    Region,
+    Q1,
+    Q2,
+    Q3,
+    Q4
+FROM [lib://Data/QuarterlySales.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+
+
+NumbersDemo:
+LOAD
+    IterNo() AS SequenceNo,
+    100 + IterNo() AS SampleValue
+AUTOGENERATE 1
+WHILE IterNo() <= 10;
+
+
+
+
+
+
+
+
+
+INNER KEEP retains matching ProductID records in both tables.
+Products:
+LOAD
+    ProductID,
+    ProductName,
+    Category
+INLINE [
+ProductID, ProductName, Category
+P01, Notebook, Stationery
+P02, Pen, Stationery
+P03, Backpack, Bags
+P04, Water Bottle, Accessories
+];
+
+INNER KEEP (Products)
+LOAD
+    OrderID,
+    ProductID,
+    Quantity
+INLINE [
+OrderID, ProductID, Quantity
+O101, P01, 10
+O102, P02, 20
+O103, P03, 5
+O104, P05, 8
+];
+
+
+
+left keep retain all records from first source
+
+Products:
+LOAD
+    ProductID,
+    ProductName,
+    Category
+INLINE [
+ProductID, ProductName, Category
+P01, Notebook, Stationery
+P02, Pen, Stationery
+P03, Backpack, Bags
+P04, Water Bottle, Accessories
+];
+
+Left KEEP (Products)
+LOAD
+    OrderID,
+    ProductID,
+    Quantity
+INLINE [
+OrderID, ProductID, Quantity
+O101, P01, 10
+O102, P02, 20
+O103, P03, 5
+O104, P05, 8
+];
+
+
+right keep retail all records from 2 table
+
+
+Products:
+LOAD
+    ProductID,
+    ProductName,
+    Category
+INLINE [
+ProductID, ProductName, Category
+P01, Notebook, Stationery
+P02, Pen, Stationery
+P03, Backpack, Bags
+P04, Water Bottle, Accessories
+];
+
+RIGHT KEEP (Products)
+LOAD
+    OrderID,
+    ProductID,
+    Quantity
+INLINE [
+OrderID, ProductID, Quantity
+O101, P01, 10
+O102, P02, 20
+O103, P03, 5
+O104, P05, 8
+];
+
+
+
+Products:
+LOAD
+    ProductID,
+    Upper(ProductName) AS ProductName,
+    Category,
+    UnitPrice,
+    UnitPrice * 1.18 AS PriceWithTax
+FROM [lib://Data/Products.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+STORE Products INTO [lib://Data/Products_Transformed.qvd] (qvd);
+
+
+
+
+
+Products:
+LOAD
+    ProductID,
+    Upper(ProductName) AS ProductName,
+    Category,
+    UnitPrice,
+    UnitPrice * 1.18 AS PriceWithTax
+FROM [lib://Data/Products.txt]
+(txt, utf8, embedded labels, delimiter is ',', msq);
+
+STORE Products INTO [lib://Data/Products_Transformed.qvd] (qvd);
+
+
+
+What is Incremental Load?
+Incremental Load is a technique in Qlik Sense that loads only new or changed records from a Data source instead of reloading the entire Dataset every time.
+
+For example, suppose a sales table contains 10 lakh records. Every day, only 500 new sales records are added.
+- Full load: Reloads all 10 lakh records.
+- Incremental load: Loads the new 500 records and combines them with previously stored Data.
+
+
+
+IF NOT IsNull(QvdCreateTime('lib://Data/Sales.qvd')) THEN
+
+ 
+    Sales:
+    LOAD
+        OrderID,
+        Customer,
+        Amount
+    FROM [lib://Data/Sales.qvd] (qvd);
+
+    // Append only new records from the source
+    Concatenate (Sales)
+    LOAD
+        OrderID,
+        Customer,
+        Amount
+    FROM [lib://Data/Sales.txt]
+    (txt, utf8, embedded labels, delimiter is ',', msq)
+    WHERE NOT Exists(OrderID);
+
+ELSE
+
+    // First reload: load all source records
+    Sales:
+    LOAD
+        OrderID,
+        Customer,
+        Amount
+    FROM [lib://Data/Sales.txt]
+    (txt, utf8, embedded labels, delimiter is ',', msq);
+
+ENDIF
+
+// Save the updated Dataset
+STORE Sales INTO [lib://Data/Sales.qvd] (qvd);
